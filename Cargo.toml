@@ -4,4 +4,11 @@ version = "0.1.0"
 authors = ["Mike MacDonald <crazymykl@gmail.com>"]
 edition = "2018"
 
+[features]
+default = []
+
+parallelism = ["rayon", "atomic_refcell"]
+
 [dependencies]
+rayon = { version = "1.0.2", optional = true }
+atomic_refcell = { version = "0.1.1", optional = true }

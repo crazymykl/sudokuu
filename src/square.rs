@@ -1,6 +1,11 @@
 use self::Square::{Fixed, Possible};
 use std::fmt::{self, Debug, Display};
 
+#[cfg(feature = "parallelism")]
+pub type SquareCell = atomic_refcell::AtomicRefCell<Square>;
+#[cfg(not(feature = "parallelism"))]
+pub type SquareCell = std::cell::RefCell<Square>;
+
 #[derive(PartialEq, Eq, Clone)]
 pub enum Square {
     Fixed(u8),

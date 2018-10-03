@@ -1,15 +1,14 @@
-use crate::square::Square;
-use std::cell::RefCell;
+use crate::square::SquareCell;
 
 #[derive(Debug)]
 pub struct ProgrammedIterator<'a> {
-    squares: &'a [RefCell<Square>],
+    squares: &'a [SquareCell],
     program: &'static [usize],
     position: usize,
 }
 
 impl<'a> ProgrammedIterator<'a> {
-    pub fn new(squares: &'a [RefCell<Square>], program: &'static [usize]) -> Self {
+    pub fn new(squares: &'a [SquareCell], program: &'static [usize]) -> Self {
         Self {
             squares,
             program,
@@ -19,7 +18,7 @@ impl<'a> ProgrammedIterator<'a> {
 }
 
 impl<'a> Iterator for ProgrammedIterator<'a> {
-    type Item = Vec<&'a RefCell<Square>>;
+    type Item = Vec<&'a SquareCell>;
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.position >= self.program.len() {

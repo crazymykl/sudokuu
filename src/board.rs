@@ -1,10 +1,10 @@
 use crate::programmed_iterator::ProgrammedIterator;
-use crate::square::Square::{self, Fixed, Possible};
-use std::cell::RefCell;
+use crate::square::Square::{Fixed, Possible};
+use crate::square::{Square, SquareCell};
 use std::fmt::{self, Debug, Display};
 use std::str::FromStr;
 
-pub type Grid = Vec<RefCell<Square>>;
+pub type Grid = Vec<SquareCell>;
 
 #[derive(Clone, PartialEq)]
 pub struct Board {
@@ -73,10 +73,23 @@ impl Board {
         } else if pruned.is_solved() {
             Some(pruned)
         } else {
-            let (left, right) = pruned.next_grids();
-
-            left.solve().or_else(|| right.solve())
+            pruned.solve_rec()
         }
+    }
+
+    #[cfg(feature = "parallelism")]
+    fn solve_rec(&self) -> Option<Self> {
+        let (left, right) = self.next_grids();
+        let (left, right) = rayon::join(|| left.solve(), || right.solve());
+
+        left.or(right)
+    }
+
+    #[cfg(not(feature = "parallelism"))]
+    fn solve_rec(&self) -> Option<Self> {
+        let (left, right) = self.next_grids();
+
+        left.solve().or_else(|| right.solve())
     }
 
     fn is_valid(&self) -> bool {
@@ -131,7 +144,7 @@ fn valid_groups(mut groups: ProgrammedIterator) -> bool {
     groups.all(|g| valid_group(&g))
 }
 
-fn valid_group(group: &[&RefCell<Square>]) -> bool {
+fn valid_group(group: &[&SquareCell]) -> bool {
     group
         .iter()
         .fold(Some(vec![]), |acc, c| match c.borrow().clone() {
@@ -157,7 +170,7 @@ fn prune_groups(groups: ProgrammedIterator) {
     }
 }
 
-fn prune_group(group: &[&RefCell<Square>]) {
+fn prune_group(group: &[&SquareCell]) {
     let fixeds = group
         .iter()
         .filter_map(|sq| sq.borrow().fixed())
@@ -171,7 +184,7 @@ fn prune_group(group: &[&RefCell<Square>]) {
     }
 }
 
-fn read_square(c: char) -> Result<RefCell<Square>, String> {
+fn read_square(c: char) -> Result<SquareCell, String> {
     match c {
         '1'..='9' => c
             .to_digit(10)
@@ -179,7 +192,7 @@ fn read_square(c: char) -> Result<RefCell<Square>, String> {
             .ok_or_else(|| "IMPOSSIBLE".into()),
         '.' => Ok(Square::Possible(vec![1, 2, 3, 4, 5, 6, 7, 8, 9])),
         _ => Err(format!("Invalid character '{}' (valid are 1-9 and .)", &c)),
-    }.map(RefCell::new)
+    }.map(SquareCell::new)
 }
 
 impl Debug for Board {
@@ -201,7 +214,7 @@ impl Display for Board {
                 write!(
                     f,
                     "{}{}",
-                    &square.borrow(),
+                    &square.borrow().clone(),
                     (if i % 9 == 8 { "\n" } else { " " })
                 )
             }).collect()

@@ -1,4 +1,7 @@
-use std::env;
+#[cfg(feature = "parallelism")]
+extern crate atomic_refcell;
+#[cfg(feature = "parallelism")]
+extern crate rayon;
 
 mod board;
 mod programmed_iterator;
@@ -8,7 +11,7 @@ use self::board::Board;
 use std::str::FromStr;
 
 fn main() {
-    for arg in env::args().skip(1) {
+    for arg in std::env::args().skip(1) {
         match Board::from_str(&arg) {
             Ok(x) => println!(
                 "{}\n{}",
