@@ -1,5 +1,4 @@
 use crate::programmed_iterator::ProgrammedIterator;
-use crate::square::Square::{Fixed, Possible};
 use crate::square::{Square, SquareCell};
 use std::fmt::{self, Debug, Display};
 use std::str::FromStr;
@@ -65,6 +64,7 @@ impl Board {
             }
         }
     }
+
     pub fn solve(&self) -> Option<Self> {
         let pruned = self.prune();
 
@@ -114,17 +114,13 @@ impl Board {
     }
 
     fn split_at(&self, idx: usize) -> (Self, Self) {
-        if let Some(ys) = self.squares.get(idx).and_then(|sq| sq.borrow().possibles()) {
-            let (mut first, mut rest) = (self.clone(), self.clone());
+        let (fixed, possible) = self.squares[idx].borrow().split();
+        let (mut first, mut rest) = (self.clone(), self.clone());
 
-            *first.squares[idx].borrow_mut() = Fixed(ys[0]);
-            *rest.squares[idx].borrow_mut() = Square::new(&ys[1..])
-                .unwrap_or_else(|| panic!("Illegal split_at index {}: {:?}", idx, self));
+        *first.squares[idx].borrow_mut() = fixed;
+        *rest.squares[idx].borrow_mut() = possible;
 
-            (first, rest)
-        } else {
-            panic!("Attempt to split_at impossible index {}: {:?}", idx, self)
-        }
+        (first, rest)
     }
 
     pub fn rows(&self) -> ProgrammedIterator {
@@ -141,27 +137,7 @@ impl Board {
 }
 
 fn valid_groups(mut groups: ProgrammedIterator) -> bool {
-    groups.all(|g| valid_group(&g))
-}
-
-fn valid_group(group: &[&SquareCell]) -> bool {
-    group
-        .iter()
-        .fold(Some(vec![]), |acc, c| match c.borrow().clone() {
-            Possible(xs) => if xs.is_empty() {
-                None
-            } else {
-                acc
-            },
-            Fixed(x) => acc.and_then(|mut a| {
-                if a.contains(&x) {
-                    None
-                } else {
-                    a.push(x);
-                    Some(a)
-                }
-            }),
-        }).is_some()
+    groups.all(|g| Square::valid_group(&g))
 }
 
 fn prune_groups(groups: ProgrammedIterator) {
@@ -171,14 +147,11 @@ fn prune_groups(groups: ProgrammedIterator) {
 }
 
 fn prune_group(group: &[&SquareCell]) {
-    let fixeds = group
-        .iter()
-        .filter_map(|sq| sq.borrow().fixed())
-        .collect::<Vec<_>>();
+    let fixeds = Square::fixed_values(group);
 
     for sq in group {
         let mut sq = sq.borrow_mut();
-        if let Some(new_sq) = sq.minus(&fixeds) {
+        if let Some(new_sq) = sq.minus(fixeds) {
             *sq = new_sq;
         }
     }
@@ -188,9 +161,9 @@ fn read_square(c: char) -> Result<SquareCell, String> {
     match c {
         '1'..='9' => c
             .to_digit(10)
-            .and_then(|x| Square::new(&[x as u8]))
+            .map(Square::new_fixed)
             .ok_or_else(|| "IMPOSSIBLE".into()),
-        '.' => Ok(Square::Possible(vec![1, 2, 3, 4, 5, 6, 7, 8, 9])),
+        '.' => Ok(Square::any()),
         _ => Err(format!("Invalid character '{}' (valid are 1-9 and .)", &c)),
     }.map(SquareCell::new)
 }

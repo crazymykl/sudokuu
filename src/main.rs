@@ -1,7 +1,5 @@
-#[cfg(feature = "parallelism")]
-extern crate atomic_refcell;
-#[cfg(feature = "parallelism")]
-extern crate rayon;
+#[macro_use]
+extern crate bitflags;
 
 mod board;
 mod programmed_iterator;
