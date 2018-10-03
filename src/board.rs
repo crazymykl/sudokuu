@@ -1,5 +1,5 @@
 use crate::programmed_iterator::ProgrammedIterator;
-use crate::square::{Square, SquareCell};
+use crate::square::{self, SquareCell};
 use std::fmt::{self, Debug, Display};
 use std::str::FromStr;
 
@@ -137,35 +137,13 @@ impl Board {
 }
 
 fn valid_groups(mut groups: ProgrammedIterator) -> bool {
-    groups.all(|g| Square::valid_group(&g))
+    groups.all(|g| square::valid_group(&g))
 }
 
 fn prune_groups(groups: ProgrammedIterator) {
     for g in groups {
-        prune_group(&g);
+        square::prune_group(&g);
     }
-}
-
-fn prune_group(group: &[&SquareCell]) {
-    let fixeds = Square::fixed_values(group);
-
-    for sq in group {
-        let mut sq = sq.borrow_mut();
-        if let Some(new_sq) = sq.minus(fixeds) {
-            *sq = new_sq;
-        }
-    }
-}
-
-fn read_square(c: char) -> Result<SquareCell, String> {
-    match c {
-        '1'..='9' => c
-            .to_digit(10)
-            .map(Square::new_fixed)
-            .ok_or_else(|| "IMPOSSIBLE".into()),
-        '.' => Ok(Square::any()),
-        _ => Err(format!("Invalid character '{}' (valid are 1-9 and .)", &c)),
-    }.map(SquareCell::new)
 }
 
 impl Debug for Board {
@@ -203,7 +181,7 @@ impl FromStr for Board {
         }
 
         s.chars()
-            .map(read_square)
+            .map(square::from_char)
             .collect::<Result<Grid, Self::Err>>()
             .map(Board::new)
             .and_then(|brd| {

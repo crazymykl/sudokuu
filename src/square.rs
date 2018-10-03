@@ -78,31 +78,12 @@ pub enum Square {
 }
 
 impl Square {
-    pub fn new(values: Possibilities) -> Option<Self> {
-        match values.pop_count() {
-            0 => None,
-            1 => Some(Fixed(values)),
-            _ => Some(Possible(values)),
-        }
-    }
-
     pub fn new_fixed(x: u32) -> Self {
         Fixed(Possibilities::new_from_u32(x))
     }
 
     pub fn any() -> Self {
         Possible(Possibilities::all())
-    }
-
-    pub fn fixed_values(xs: &[&SquareCell]) -> Possibilities {
-        xs.iter()
-            .filter_map(|sq| sq.borrow().fixed())
-            .fold(Possibilities::empty(), |acc, sq| acc | sq)
-    }
-
-    pub fn valid_group(g: &[&SquareCell]) -> bool {
-        g.iter().filter(|sq| sq.borrow().is_fixed()).count() as u32
-            == Self::fixed_values(g).pop_count()
     }
 
     pub fn probability_count(&self) -> u32 {
@@ -133,7 +114,7 @@ impl Square {
     pub fn minus(&self, to_remove: Possibilities) -> Option<Self> {
         match *self {
             Fixed(x) => Some(Fixed(x)),
-            Possible(xs) => Square::new(xs - to_remove),
+            Possible(xs) => Self::from_possibilities(xs - to_remove),
         }
     }
 
@@ -143,9 +124,17 @@ impl Square {
 
         (
             Self::new_fixed(val),
-            Self::new(poss - Possibilities::new_from_u32(val))
+            Self::from_possibilities(poss - Possibilities::new_from_u32(val))
                 .expect("Called split_at on invalid Possible"),
         )
+    }
+
+    fn from_possibilities(values: Possibilities) -> Option<Self> {
+        match values.pop_count() {
+            0 => None,
+            1 => Some(Fixed(values)),
+            _ => Some(Possible(values)),
+        }
     }
 }
 
@@ -175,6 +164,40 @@ impl Display for Square {
         match self {
             Fixed(n) => write!(f, "{}", n.single_selection()),
             Possible(_) => write!(f, "."),
+        }
+    }
+}
+
+pub fn from_char(c: char) -> Result<SquareCell, String> {
+    match c {
+        '1'..='9' => c
+            .to_digit(10)
+            .map(Square::new_fixed)
+            .ok_or_else(|| "IMPOSSIBLE".into()),
+        '.' => Ok(Square::any()),
+        _ => Err(format!("Invalid character '{}' (valid are 1-9 and .)", &c)),
+    }.map(SquareCell::new)
+}
+
+fn fixed_values(group: &[&SquareCell]) -> Possibilities {
+    group
+        .iter()
+        .filter_map(|sq| sq.borrow().fixed())
+        .fold(Possibilities::empty(), |acc, sq| acc | sq)
+}
+
+pub fn valid_group(group: &[&SquareCell]) -> bool {
+    fixed_values(group).pop_count()
+        == group.iter().filter(|sq| sq.borrow().is_fixed()).count() as u32
+}
+
+pub fn prune_group(group: &[&SquareCell]) {
+    let fixeds = fixed_values(group);
+
+    for sq in group {
+        let mut sq = sq.borrow_mut();
+        if let Some(new_sq) = sq.minus(fixeds) {
+            *sq = new_sq;
         }
     }
 }
