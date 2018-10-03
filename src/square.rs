@@ -1,6 +1,5 @@
-use std::fmt::{self, Debug, Display};
-
 use self::Square::{Fixed, Possible};
+use std::fmt::{self, Debug, Display};
 
 #[derive(PartialEq, Eq, Clone)]
 pub enum Square {
@@ -24,6 +23,13 @@ impl Square {
         }
     }
 
+    pub fn fixed(&self) -> Option<u8> {
+        match self {
+            Fixed(x) => Some(*x),
+            Possible(_) => None,
+        }
+    }
+
     pub fn possibles(&self) -> Option<Vec<u8>> {
         match self {
             Fixed(_) => None,
@@ -32,10 +38,7 @@ impl Square {
     }
 
     pub fn is_fixed(&self) -> bool {
-        match self {
-            Fixed(_) => true,
-            _ => false,
-        }
+        self.fixed().is_some()
     }
 
     pub fn minus(&self, to_remove: &[u8]) -> Option<Self> {

@@ -1,9 +1,8 @@
+use crate::programmed_iterator::ProgrammedIterator;
+use crate::square::Square::{self, Fixed, Possible};
 use std::cell::RefCell;
 use std::fmt::{self, Debug, Display};
 use std::str::FromStr;
-
-use super::programmed_iterator::ProgrammedIterator;
-use super::square::Square::{self, Fixed, Possible};
 
 pub type Grid = Vec<RefCell<Square>>;
 
@@ -54,9 +53,18 @@ impl Board {
     }
 
     pub fn prune(&self) -> Self {
-        self.clone().prune_rec(self.prune_step())
-    }
+        loop {
+            let old = self.clone();
 
+            prune_groups(self.rows());
+            prune_groups(self.cols());
+            prune_groups(self.boxes());
+
+            if old == *self {
+                return old;
+            }
+        }
+    }
     pub fn solve(&self) -> Option<Self> {
         let pruned = self.prune();
 
@@ -93,7 +101,7 @@ impl Board {
     }
 
     fn split_at(&self, idx: usize) -> (Self, Self) {
-        if let Some(ys) = self.squares.get(idx).map(|sq| sq.borrow().possibles()) {
+        if let Some(ys) = self.squares.get(idx).and_then(|sq| sq.borrow().possibles()) {
             let (mut first, mut rest) = (self.clone(), self.clone());
 
             *first.squares[idx].borrow_mut() = Fixed(ys[0]);
@@ -104,22 +112,6 @@ impl Board {
         } else {
             panic!("Attempt to split_at impossible index {}: {:?}", idx, self)
         }
-    }
-
-    fn prune_rec(self, other: Self) -> Self {
-        if self == other {
-            self
-        } else {
-            let step = other.prune_step();
-            other.prune_rec(step)
-        }
-    }
-
-    fn prune_step(&self) -> Self {
-        prune_groups(self.rows())
-            .and_then(|brd| prune_groups(brd.cols()).map(|brd| brd.cols().into_board()))
-            .and_then(|brd| prune_groups(brd.boxes()).map(|brd| brd.boxes().into_board()))
-            .unwrap_or_else(|| self.clone())
     }
 
     pub fn rows(&self) -> ProgrammedIterator {
@@ -139,53 +131,55 @@ fn valid_groups(mut groups: ProgrammedIterator) -> bool {
     groups.all(|g| valid_group(&g))
 }
 
-fn valid_group(group: &[&Square]) -> bool {
+fn valid_group(group: &[&RefCell<Square>]) -> bool {
     group
         .iter()
-        .fold(Some(vec![]), |acc, c| match c {
+        .fold(Some(vec![]), |acc, c| match c.borrow().clone() {
             Possible(xs) => if xs.is_empty() {
                 None
             } else {
                 acc
             },
             Fixed(x) => acc.and_then(|mut a| {
-                if a.contains(x) {
+                if a.contains(&x) {
                     None
                 } else {
-                    a.push(*x);
+                    a.push(x);
                     Some(a)
                 }
             }),
         }).is_some()
 }
 
-fn prune_groups(groups: ProgrammedIterator) -> Option<Board> {
-    groups
-        .map(|g| prune_group(&g))
-        .collect::<Option<Vec<_>>>()
-        .map(|g| Board::new(g.concat()))
+fn prune_groups(groups: ProgrammedIterator) {
+    for g in groups {
+        prune_group(&g);
+    }
 }
 
-fn prune_group(group: &[&Square]) -> Option<Vec<Square>> {
+fn prune_group(group: &[&RefCell<Square>]) {
     let fixeds = group
         .iter()
-        .filter_map(|c| match c {
-            Fixed(x) => Some(x),
-            _ => None,
-        }).cloned()
+        .filter_map(|sq| sq.borrow().fixed())
         .collect::<Vec<_>>();
 
-    group.iter().map(|c| c.minus(&fixeds)).collect()
+    for sq in group {
+        let mut sq = sq.borrow_mut();
+        if let Some(new_sq) = sq.minus(&fixeds) {
+            *sq = new_sq;
+        }
+    }
 }
 
-fn read_square(c: char) -> Result<Square, String> {
+fn read_square(c: char) -> Result<RefCell<Square>, String> {
     match c {
         '1'..='9' => c
             .to_digit(10)
-            .map_or(Err("IMPOSSIBLE".into()), |x| Ok(Square::Fixed(x as u8))),
+            .and_then(|x| Square::new(&[x as u8]))
+            .ok_or_else(|| "IMPOSSIBLE".into()),
         '.' => Ok(Square::Possible(vec![1, 2, 3, 4, 5, 6, 7, 8, 9])),
         _ => Err(format!("Invalid character '{}' (valid are 1-9 and .)", &c)),
-    }
+    }.map(RefCell::new)
 }
 
 impl Debug for Board {
@@ -203,8 +197,14 @@ impl Display for Board {
         self.squares
             .iter()
             .enumerate()
-            .map(|(i, square)| write!(f, "{}{}", &square, (if i % 9 == 8 { "\n" } else { " " })))
-            .collect()
+            .map(|(i, square)| {
+                write!(
+                    f,
+                    "{}{}",
+                    &square.borrow(),
+                    (if i % 9 == 8 { "\n" } else { " " })
+                )
+            }).collect()
     }
 }
 
