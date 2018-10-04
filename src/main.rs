@@ -2,6 +2,7 @@
 extern crate bitflags;
 
 mod board;
+mod possibilites;
 mod programmed_iterator;
 mod square;
 

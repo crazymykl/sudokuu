@@ -1,9 +1,9 @@
 use crate::programmed_iterator::ProgrammedIterator;
-use crate::square::{self, SquareCell};
+use crate::square::{self, Square};
 use std::fmt::{self, Debug, Display};
 use std::str::FromStr;
 
-pub type Grid = Vec<SquareCell>;
+pub type Grid = Vec<Square>;
 
 #[derive(Clone, PartialEq)]
 pub struct Board {
@@ -80,7 +80,7 @@ impl Board {
     #[cfg(feature = "parallelism")]
     fn solve_rec(&self) -> Option<Self> {
         let (left, right) = self.next_grids();
-        let (left, right) = rayon::join(|| left.solve(), || right.solve());
+        let (left, right) = rayon::join(move || left.solve(), move || right.solve());
 
         left.or(right)
     }
@@ -97,7 +97,7 @@ impl Board {
     }
 
     fn is_solved(&self) -> bool {
-        self.squares.iter().all(|x| x.borrow().is_fixed())
+        self.squares.iter().all(|x| x.is_fixed())
     }
 
     fn next_grids(&self) -> (Self, Self) {
@@ -105,8 +105,8 @@ impl Board {
             .squares
             .iter()
             .enumerate()
-            .filter(|(_, c)| !c.borrow().is_fixed())
-            .min_by_key(|(_, c)| c.borrow().probability_count())
+            .filter(|(_, c)| !c.is_fixed())
+            .min_by_key(|(_, c)| c.possibles_count())
             .map(|(i, _)| i)
             .expect("Called next_grids on solved board?");
 
@@ -114,11 +114,11 @@ impl Board {
     }
 
     fn split_at(&self, idx: usize) -> (Self, Self) {
-        let (fixed, possible) = self.squares[idx].borrow().split();
+        let (fixed, possible) = self.squares[idx].split();
         let (mut first, mut rest) = (self.clone(), self.clone());
 
-        *first.squares[idx].borrow_mut() = fixed;
-        *rest.squares[idx].borrow_mut() = possible;
+        first.squares[idx] = fixed;
+        rest.squares[idx] = possible;
 
         (first, rest)
     }
@@ -165,7 +165,7 @@ impl Display for Board {
                 write!(
                     f,
                     "{}{}",
-                    &square.borrow().clone(),
+                    &square.clone(),
                     (if i % 9 == 8 { "\n" } else { " " })
                 )
             }).collect()
