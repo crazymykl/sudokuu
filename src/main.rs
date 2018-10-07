@@ -1,6 +1,3 @@
-#[macro_use]
-extern crate bitflags;
-
 mod board;
 mod possibilites;
 mod programmed_iterator;

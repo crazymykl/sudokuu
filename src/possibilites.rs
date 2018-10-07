@@ -1,3 +1,5 @@
+use bitflags::bitflags;
+
 bitflags! {
     pub struct Possibilities: u32 {
         const _1 = 0b0000_0000_0000_0001;
