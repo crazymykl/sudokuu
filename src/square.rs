@@ -1,4 +1,4 @@
-use crate::possibilites::Possibilities;
+use crate::possibilites::{Map, Possibilities};
 use std::cell::Cell;
 use std::fmt::{self, Debug, Display};
 
@@ -96,14 +96,14 @@ impl Display for Square {
     }
 }
 
-pub fn from_char(c: char) -> Result<Square, String> {
+pub fn from_char(c: char) -> Result<Square, char> {
     match c {
         '1'..='9' => c
             .to_digit(10)
             .map(Square::new_fixed)
-            .ok_or_else(|| "IMPOSSIBLE".into()),
+            .ok_or(c),
         '.' => Ok(Square::any()),
-        _ => Err(format!("Invalid character '{}' (valid are 1-9 and .)", &c)),
+        _ => Err(c),
     }
 }
 
@@ -112,6 +112,39 @@ fn fixed_values(group: &[&Square]) -> Possibilities {
         .iter()
         .filter_map(|sq| sq.fixed())
         .fold(Possibilities::empty(), |acc, sq| acc | sq)
+}
+
+fn exclusive_possibilities(group: &[&Square]) -> Vec<Possibilities> {
+    let mut possibilites_by_index = Map::new();
+    let mut possibilites_for_squares = Map::new();
+
+    group
+        .iter()
+        .enumerate()
+        .filter_map(|(i, sq)| {
+            sq.possibles()
+                .map(|sq| (Possibilities::new_from_u32(i as u32 + 1), sq))
+        }).for_each(|(i, poss)| {
+            Possibilities::each().iter()
+                .filter(|&&x| poss.contains(x))
+                .for_each(|&x|possibilites_by_index.add_possible(x, i))
+            }
+        );
+
+    possibilites_by_index
+        .into_iter()
+        .filter(|(_i, poss)| poss.pop_count() < 4)
+        .for_each(|(i, poss)| possibilites_for_squares.add_possible(poss, i));
+
+    possibilites_for_squares
+        .into_iter()
+        .filter_map(|(sqs, poss)| {
+            if sqs.pop_count() == poss.pop_count() {
+                Some(poss)
+            } else {
+                None
+            }
+        }).collect()
 }
 
 pub fn valid_group(group: &[&Square]) -> bool {
@@ -133,9 +166,20 @@ pub fn valid_group(group: &[&Square]) -> bool {
 
 pub fn prune_group(group: &[&Square]) {
     let fixeds = fixed_values(group);
+    let exclusives = exclusive_possibilities(group);
+    let all_exclusives = exclusives
+        .iter()
+        .fold(Possibilities::empty(), |acc, &x| acc | x);
 
     group
         .iter()
         .filter(|sq| !sq.is_fixed())
-        .for_each(|sq| sq.minus(fixeds));
+        .for_each(|sq| {
+            sq.minus(fixeds);
+
+            let intersection = sq.get() & all_exclusives;
+            if exclusives.contains(&intersection) {
+                sq.set(intersection)
+            }
+        })
 }

@@ -23,6 +23,6 @@ fn solve_str(arg: &str) {
                 .map(|b| b.to_string())
                 .unwrap_or_else(|| "No solution".into())
         ),
-        e => println!("{:?}", &e),
+        Err(e) => println!("{}", e),
     }
 }

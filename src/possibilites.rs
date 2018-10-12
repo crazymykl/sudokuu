@@ -30,6 +30,20 @@ impl Possibilities {
         }
     }
 
+    pub fn each() -> [Self; 9] {
+        [
+            Self::_1,
+            Self::_2,
+            Self::_3,
+            Self::_4,
+            Self::_5,
+            Self::_6,
+            Self::_7,
+            Self::_8,
+            Self::_9,
+        ]
+    }
+
     pub fn pop_count(self) -> u32 {
         self.bits().count_ones()
     }
@@ -62,5 +76,31 @@ impl Possibilities {
             32 => 0,
             n => n + 1,
         }
+    }
+}
+
+#[derive(Debug)]
+pub struct Map(Vec<(Possibilities, Possibilities)>);
+
+impl Map {
+    pub fn new() -> Self {
+        Map(vec![])
+    }
+
+    pub fn add_possible(&mut self, key: Possibilities, val: Possibilities) {
+        if let Some(pair) = self.0.iter_mut().find(|(k, _v)| *k == key) {
+            *pair = (key, pair.1 | val);
+        } else {
+            self.0.push((key, val))
+        }
+    }
+}
+
+impl IntoIterator for Map {
+    type Item = (Possibilities, Possibilities);
+    type IntoIter = ::std::vec::IntoIter<(Possibilities, Possibilities)>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.into_iter()
     }
 }

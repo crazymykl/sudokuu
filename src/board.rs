@@ -168,27 +168,52 @@ impl Display for Board {
                     &square.clone(),
                     (if i % 9 == 8 { "\n" } else { " " })
                 )
-            }).collect()
+            })
+            .collect()
+    }
+}
+
+#[derive(Debug)]
+pub enum BoardErr {
+    InvalidLength,
+    Unsolvable,
+    InvalidCell(char),
+}
+
+impl Display for BoardErr {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(
+            f,
+            "{}",
+            match self {
+                BoardErr::InvalidLength => "Boards must be 81 cells long.".into(),
+                BoardErr::Unsolvable => "Unsolvable board.".into(),
+                BoardErr::InvalidCell(c) => {
+                    format!("Invalid character '{}' (valid are 1-9 and .)", c)
+                }
+            }
+        )
     }
 }
 
 impl FromStr for Board {
-    type Err = String;
+    type Err = BoardErr;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         if s.len() != 81 {
-            return Err("Grids must be 81 squares long".into());
+            return Err(BoardErr::InvalidLength);
         }
 
         s.chars()
             .map(square::from_char)
-            .collect::<Result<Grid, Self::Err>>()
+            .collect::<Result<Grid, char>>()
             .map(Board::new)
+            .map_err(BoardErr::InvalidCell)
             .and_then(|brd| {
                 if brd.is_valid() {
-                    Ok(brd.prune())
+                    Ok(brd)
                 } else {
-                    Err("Unsolvable board!".into())
+                    Err(BoardErr::Unsolvable)
                 }
             })
     }
